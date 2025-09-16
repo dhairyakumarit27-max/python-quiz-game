@@ -8,25 +8,23 @@ from gspread.exceptions import SpreadsheetNotFound
 from google.oauth2.service_account import Credentials
 
 # ---------- Google Sheets authorization ----------
-creds = Credentials.from_service_account_file("credentials.json")
+creds = Credentials.from_service_account_info(
+    json.loads(st.secrets["GOOGLE_CREDENTIALS"])
+)
+
 client = gspread.authorize(creds)
 
 
 # ---------- Google Sheets client helper ----------
 def get_gspread_client():
     """
-    Returns a gspread client using:
-    1. Streamlit secrets (recommended)
-    2. Fallback to local credentials.json if secrets not found
+    Returns a gspread client using Streamlit secrets.
     """
-    if "gcp_service_account_json" in st.secrets:
-        creds_dict = json.loads(st.secrets["gcp_service_account_json"])
-        creds = Credentials.from_service_account_info(creds_dict)
-        client = gspread.authorize(creds)
-    else:
-        # Fallback: load from local file (credentials.json)
-        client = gspread.service_account(filename="credentials.json")
+    creds_dict = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
+    creds = Credentials.from_service_account_info(creds_dict)
+    client = gspread.authorize(creds)
     return client
+
 
 # ---------- Open sheet and ensure headers ----------
 def open_sheet(sheet_name="QuizResults"):
