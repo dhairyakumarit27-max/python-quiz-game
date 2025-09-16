@@ -7,6 +7,49 @@ import pandas as pd
 from gspread.exceptions import SpreadsheetNotFound
 from google.oauth2.service_account import Credentials
 
+# ---------- QUIZ UI SETUP ----------
+st.set_page_config(page_title="Python Quiz Game", page_icon="🧠", layout="centered")
+
+# Custom CSS styling
+st.markdown("""
+    <style>
+    .main {
+        background-color: #f9f9fc;
+    }
+    div.block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+    }
+    h1, h2, h3 {
+        text-align: center;
+        color: #2c3e50;
+    }
+    .question-box {
+        padding: 15px;
+        margin: 10px 0;
+        border-radius: 10px;
+        background-color: #ffffff;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .stButton>button {
+        background: linear-gradient(135deg, #4e8cff, #6c5ce7);
+        color: white;
+        border-radius: 10px;
+        padding: 8px 16px;
+        font-size: 16px;
+        border: none;
+    }
+    .stButton>button:hover {
+        background: linear-gradient(135deg, #6c5ce7, #4e8cff);
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# Header
+st.title("🧠 Python Quiz Game")
+st.markdown("Welcome to the interactive quiz! Test your knowledge and track your score on the leaderboard.")
+st.divider()
+
 # ---------- Google Sheets client helper ----------
 def get_gspread_client():
     """
