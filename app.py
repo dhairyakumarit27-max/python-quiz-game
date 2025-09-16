@@ -7,7 +7,40 @@ import pandas as pd
 from gspread.exceptions import SpreadsheetNotFound
 from google.oauth2.service_account import Credentials
 
-# ---------- QUIZ UI SETUP ----------
+# ---------- QUIZ UI SETUP + THEME ----------
+
+# Force custom theme
+def apply_custom_theme():
+    st.markdown(
+        """
+        <style>
+        body, .stApp {
+            background-color: #FFFFFF; /* White background */
+            color: #000000;           /* Black text */
+        }
+        .stRadio label, .stSelectbox label, .stTextInput label {
+            color: #000000 !important; /* Black labels */
+        }
+        .stButton>button {
+            background-color: #4B9CD3; /* Blue button */
+            color: #FFFFFF;           /* White button text */
+            border-radius: 8px;
+            border: none;
+            padding: 0.5em 1em;
+            font-weight: bold;
+        }
+        .stButton>button:hover {
+            background-color: #357ABD; /* Darker blue on hover */
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+# Apply theme right away
+apply_custom_theme()
+
+# Quiz UI
 st.title("🧠 Fun Quiz Game")
 
 def show_question(question_data, q_index, total_qs):
@@ -21,7 +54,6 @@ def show_question(question_data, q_index, total_qs):
         key=f"q_{q_index}"
     )
     return choice
-
 
 # ---------- Google Sheets client helper ----------
 def get_gspread_client():
