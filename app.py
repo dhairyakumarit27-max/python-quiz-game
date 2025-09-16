@@ -24,13 +24,6 @@ except Exception as e:
 # --------------------------------------
 
 
-# ---------- Google Sheets authorization ----------
-creds = Credentials.from_service_account_info(
-    json.loads(st.secrets["GOOGLE_CREDENTIALS"])
-)
-
-client = gspread.authorize(creds)
-
 
 # ---------- Google Sheets client helper ----------
 def get_gspread_client():
@@ -38,7 +31,11 @@ def get_gspread_client():
     Returns a gspread client using Streamlit secrets.
     """
     creds_dict = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
-    creds = Credentials.from_service_account_info(creds_dict)
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
     client = gspread.authorize(creds)
     return client
 
