@@ -30,11 +30,11 @@ def get_gspread_client():
     """
     Returns a gspread client using Streamlit secrets.
     """
-    creds_dict = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive"
     ]
+    creds_dict = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
     creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
     client = gspread.authorize(creds)
     return client
