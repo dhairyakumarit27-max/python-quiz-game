@@ -7,25 +7,6 @@ import pandas as pd
 from gspread.exceptions import SpreadsheetNotFound
 from google.oauth2.service_account import Credentials
 
-# --------- DEBUGGING SNIPPET ---------
-try:
-    creds_dict = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
-    creds = Credentials.from_service_account_info(
-        creds_dict,
-        scopes=["https://www.googleapis.com/auth/spreadsheets"]
-    )
-    client = get_gspread_client()
-    # Test by opening the sheet safely
-    client.open("QuizResults")
-    st.success("✅ Service account connected and Google Sheets access working!")
-except Exception as e:
-    st.warning("⚠️ Could not verify Google Sheets access, but the quiz may still work.")
-    st.write(e)
-
-# --------------------------------------
-
-
-
 # ---------- Google Sheets client helper ----------
 def get_gspread_client():
     """
