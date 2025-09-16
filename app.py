@@ -14,13 +14,14 @@ try:
         creds_dict,
         scopes=["https://www.googleapis.com/auth/spreadsheets"]
     )
-    client = gspread.authorize(creds)
-
-    st.write("✅ Service account connected!")
-    st.write("📂 Available Sheets:", client.list_spreadsheet_files())
-
+    client = get_gspread_client()
+    # Test by opening the sheet safely
+    client.open("QuizResults")
+    st.success("✅ Service account connected and Google Sheets access working!")
 except Exception as e:
-    st.error(f"❌ Error while testing Google Sheets access: {e}")
+    st.warning("⚠️ Could not verify Google Sheets access, but the quiz may still work.")
+    st.write(e)
+
 # --------------------------------------
 
 
