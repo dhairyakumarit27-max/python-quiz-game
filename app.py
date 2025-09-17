@@ -229,51 +229,50 @@ if "questions" not in st.session_state or st.session_state.get("active_category"
 
 questions = st.session_state.questions
 
-# ---------- SHOW QUESTIONS OR FINAL SCREEN ----------
-
+# ---------- Show question or final screen ----------
 from streamlit_autorefresh import st_autorefresh
 
-# Auto-refresh every second to update timer and auto-move
+# Auto-refresh every 1 second
 st_autorefresh(interval=1000, key="quiz_refresh")
 
 if st.session_state.q_index < len(questions):
     q = questions[st.session_state.q_index]
-
-    # Start timer if not already set
-    if "start_time" not in st.session_state or st.session_state.start_time is None:
-        st.session_state.start_time = time.time()
-
-    # Calculate remaining time
-    elapsed = int(time.time() - st.session_state.start_time)
-    time_left = max(10 - elapsed, 0)
-    st.markdown(f"**⏱ Time left:** {time_left} seconds")
-
-    # Show question + options
     st.subheader(f"Question {st.session_state.q_index + 1} of {len(questions)}")
     st.write(q["question"])
+
+    # Set timer for each question (10 sec)
+    if st.session_state.start_time is None:
+        st.session_state.start_time = time.time()
+
+    time_left = 10 - int(time.time() - st.session_state.start_time)
+    st.markdown(f"**⏱ Time left:** {max(time_left, 0)} seconds")
+
+    # Show options
     choice = st.radio("Options", q["options"], key=f"opt_{st.session_state.q_index}")
 
-    # Auto move if time runs out
-    if time_left == 0:
+    # If time runs out → auto next
+    if time_left <= 0:
         st.error("⏰ Time’s up! No points awarded.")
         st.session_state.q_index += 1
         st.session_state.start_time = None
         st.rerun()
 
-    # Auto move if answered before timer ends
+    # If answered correctly before timeout
     elif choice:
         if choice == q["answer"]:
-            st.success(f"✅ Correct!")
+            st.success("✅ Correct!")
             st.session_state.score += 1
         else:
             st.error(f"❌ Wrong! Correct answer: {q['answer']}")
-
         st.session_state.q_index += 1
         st.session_state.start_time = None
         st.rerun()
 
 else:
+    # Quiz finished
     st.success(f"🏆 Quiz Over! {st.session_state.user['name']}, your score: {st.session_state.score}/{len(questions)}")
+
+    # Leaderboard will be shown after saving to Google Sheets (next block)
 
     # Save to Google Sheets
     worksheet = open_sheet("QuizResults")
