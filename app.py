@@ -184,6 +184,17 @@ from streamlit_autorefresh import st_autorefresh
 # Auto-refresh every 1 second (for timer countdown)
 st_autorefresh(interval=1000, key="quiz_refresh")
 
+# Show feedback message if exists
+if "feedback" in st.session_state and st.session_state.feedback:
+    msg, type_ = st.session_state.feedback
+    if type_ == "success":
+        st.success(msg)
+    elif type_ == "error":
+        st.error(msg)
+    elif type_ == "info":
+        st.info(msg)
+    st.session_state.feedback = None  # clear after showing
+
 if st.session_state.q_index < len(questions):
     q = questions[st.session_state.q_index]
     st.subheader(f"Question {st.session_state.q_index + 1} of {len(questions)}")
@@ -199,7 +210,7 @@ if st.session_state.q_index < len(questions):
 
     # If time runs out
     if time_left <= 0:
-        st.error("⏰ Time’s up! No points awarded.")
+        st.session_state.feedback = ("⏰ Time’s up! No points awarded.", "error")
         st.session_state.q_index += 1
         st.session_state.start_time = None
         st.rerun()
@@ -211,12 +222,12 @@ if st.session_state.q_index < len(questions):
     if st.button("Submit Answer", key=f"submit_{st.session_state.q_index}"):
         elapsed = time.time() - st.session_state.start_time
         if elapsed > 10:
-            st.error("⏰ Time’s up! No points awarded.")
+            st.session_state.feedback = ("⏰ Time’s up! No points awarded.", "error")
         elif choice == q["answer"]:
-            st.success("✅ Correct!")
+            st.session_state.feedback = ("✅ Correct!", "success")
             st.session_state.score += 1
         else:
-            st.error(f"❌ Wrong! Correct answer: {q['answer']}")
+            st.session_state.feedback = (f"❌ Wrong! Correct answer: {q['answer']}", "error")
 
         # Move to next question
         st.session_state.q_index += 1
@@ -231,6 +242,7 @@ else:
     # Save score only once
     if "score_saved" not in st.session_state:
         st.session_state.score_saved = False
+        st.session_state.worksheet_cache = None
 
     if not st.session_state.score_saved:
         try:
@@ -243,24 +255,30 @@ else:
                  st.session_state.score],
                 value_input_option="USER_ENTERED"
             )
+            st.session_state.worksheet_cache = worksheet
             st.session_state.score_saved = True
         except Exception as e:
             st.error(f"Error saving score: {e}")
 
+    # Use cached worksheet for leaderboard
+    worksheet = st.session_state.worksheet_cache or open_sheet("QuizResults")
+
     # Show leaderboard
     st.subheader("🏅 Top 5 Players")
-    worksheet = open_sheet("QuizResults")
-    records = worksheet.get_all_records()
-    if records:
-        df = pd.DataFrame(records)
-        if "Score" in df.columns:
-            df["Score"] = pd.to_numeric(df["Score"], errors="coerce").fillna(0).astype(int)
-            top5 = df.sort_values("Score", ascending=False).head(5)
-            st.table(top5[["Name", "Score", "Category"]])
+    try:
+        records = worksheet.get_all_records()
+        if records:
+            df = pd.DataFrame(records)
+            if "Score" in df.columns:
+                df["Score"] = pd.to_numeric(df["Score"], errors="coerce").fillna(0).astype(int)
+                top5 = df.sort_values("Score", ascending=False).head(5)
+                st.table(top5[["Name", "Score", "Category"]])
+            else:
+                st.write(df.head(5))
         else:
-            st.write(df.head(5))
-    else:
-        st.write("No scores yet.")
+            st.write("No scores yet.")
+    except Exception as e:
+        st.error(f"Error loading leaderboard: {e}")
 
     # Restart button
     if st.button("Play Again"):
@@ -268,4 +286,5 @@ else:
         st.session_state.score = 0
         st.session_state.start_time = None
         st.session_state.score_saved = False
+        st.session_state.feedback = None
         st.rerun()
