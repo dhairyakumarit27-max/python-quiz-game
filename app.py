@@ -233,6 +233,9 @@ questions = st.session_state.questions
 
 from streamlit_autorefresh import st_autorefresh
 
+# Auto-refresh every second to update timer and auto-move
+st_autorefresh(interval=1000, key="quiz_refresh")
+
 if st.session_state.q_index < len(questions):
     q = questions[st.session_state.q_index]
 
@@ -240,59 +243,50 @@ if st.session_state.q_index < len(questions):
     if "start_time" not in st.session_state or st.session_state.start_time is None:
         st.session_state.start_time = time.time()
 
-    # Calculate time left
+    # Calculate remaining time
     elapsed = int(time.time() - st.session_state.start_time)
     time_left = max(10 - elapsed, 0)
-
-    st.subheader(f"Question {st.session_state.q_index + 1} of {len(questions)}")
-    st.write(q["question"])
     st.markdown(f"**⏱ Time left:** {time_left} seconds")
 
-    # Show options as buttons
-    for opt in q["options"]:
-        if st.button(opt, key=f"{st.session_state.q_index}_{opt}"):
-            if opt == q["answer"]:
-                st.success("✅ Correct!")
-                st.session_state.score += 1
-            else:
-                st.error(f"❌ Wrong! Correct answer: {q['answer']}")
-            st.session_state.q_index += 1
-            st.session_state.start_time = None
-            st.rerun()
+    # Show question + options
+    st.subheader(f"Question {st.session_state.q_index + 1} of {len(questions)}")
+    st.write(q["question"])
+    choice = st.radio("Options", q["options"], key=f"opt_{st.session_state.q_index}")
 
-    # Auto-skip when time runs out
+    # Auto move if time runs out
     if time_left == 0:
-        st.error("⏰ Time’s up! Moving to next question.")
+        st.error("⏰ Time’s up! No points awarded.")
         st.session_state.q_index += 1
         st.session_state.start_time = None
         st.rerun()
 
-    # Keep refreshing every second so timer updates
-    st_autorefresh(interval=1000, key="quiz_timer")
+    # Auto move if answered before timer ends
+    elif choice:
+        if choice == q["answer"]:
+            st.success(f"✅ Correct!")
+            st.session_state.score += 1
+        else:
+            st.error(f"❌ Wrong! Correct answer: {q['answer']}")
+
+        st.session_state.q_index += 1
+        st.session_state.start_time = None
+        st.rerun()
 
 else:
-    # Quiz finished
-    st.success(
-        f"🏆 Quiz Over! {st.session_state.user['name']}, "
-        f"your score: {st.session_state.score}/{len(questions)}"
-    )
-
-    # Save to Google Sheets
-    save_to_gsheet(st.session_state.user["name"], st.session_state.score)
-
-    # Show leaderboard
-    show_leaderboard()
+    st.success(f"🏆 Quiz Over! {st.session_state.user['name']}, your score: {st.session_state.score}/{len(questions)}")
 
     # Save to Google Sheets
     worksheet = open_sheet("QuizResults")
     ensure_headers(worksheet)
-    worksheet.append_row([st.session_state.user["name"],
-                          st.session_state.user["email"],
-                          st.session_state.active_category,
-                          st.session_state.score],
-                         value_input_option="USER_ENTERED")
+    worksheet.append_row(
+        [st.session_state.user["name"],
+         st.session_state.user["email"],
+         st.session_state.active_category,
+         st.session_state.score],
+        value_input_option="USER_ENTERED"
+    )
 
-    # Show leaderboard (Top 5)
+    # Show leaderboard
     st.subheader("🏅 Top 5 Players")
     records = worksheet.get_all_records()
     if records:
@@ -306,8 +300,10 @@ else:
     else:
         st.write("No scores yet.")
 
+    # Restart button
     if st.button("Play Again"):
         st.session_state.q_index = 0
         st.session_state.score = 0
         st.session_state.start_time = None
-        trigger_rerun()
+        st.rerun()
+
