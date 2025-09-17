@@ -225,21 +225,31 @@ if st.session_state.q_index < len(questions):
 
 else:
     # Quiz finished
-    st.success(f"🏆 Quiz Over! {st.session_state.user['name']}, your score: {st.session_state.score}/{len(questions)}")
+    st.success(f"🏆 Quiz Over! {st.session_state.user['name']}, "
+               f"your score: {st.session_state.score}/{len(questions)}")
 
-    # Save to Google Sheets
-    worksheet = open_sheet("QuizResults")
-    ensure_headers(worksheet)
-    worksheet.append_row(
-        [st.session_state.user["name"],
-         st.session_state.user["email"],
-         st.session_state.active_category,
-         st.session_state.score],
-        value_input_option="USER_ENTERED"
-    )
+    # Save score only once
+    if "score_saved" not in st.session_state:
+        st.session_state.score_saved = False
+
+    if not st.session_state.score_saved:
+        try:
+            worksheet = open_sheet("QuizResults")
+            ensure_headers(worksheet)
+            worksheet.append_row(
+                [st.session_state.user["name"],
+                 st.session_state.user["email"],
+                 st.session_state.active_category,
+                 st.session_state.score],
+                value_input_option="USER_ENTERED"
+            )
+            st.session_state.score_saved = True
+        except Exception as e:
+            st.error(f"Error saving score: {e}")
 
     # Show leaderboard
     st.subheader("🏅 Top 5 Players")
+    worksheet = open_sheet("QuizResults")
     records = worksheet.get_all_records()
     if records:
         df = pd.DataFrame(records)
@@ -257,5 +267,5 @@ else:
         st.session_state.q_index = 0
         st.session_state.score = 0
         st.session_state.start_time = None
+        st.session_state.score_saved = False
         st.rerun()
-
