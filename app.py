@@ -59,59 +59,8 @@ def apply_custom_theme():
 apply_custom_theme()
 
 # ---------- QUIZ UI SETUP ----------
-from streamlit_autorefresh import st_autorefresh
 
 st.title("🧠 Fun Quiz Game")
-
-def show_question(question_data, q_index, total_qs):
-    # Auto-refresh every second (to update timer without clicks)
-    st_autorefresh(interval=1000, key=f"refresh_{q_index}")
-
-    # Initialize state if needed
-    if "quiz_finished" not in st.session_state:
-        st.session_state.quiz_finished = False
-    if "current_q" not in st.session_state:
-        st.session_state.current_q = 0
-    if "answers" not in st.session_state:
-        st.session_state.answers = {}
-    if "timer_start" not in st.session_state:
-        st.session_state.timer_start = time.time()
-
-    # If quiz is finished → return
-    if st.session_state.quiz_finished:
-        return None
-
-    # Timer
-    elapsed = int(time.time() - st.session_state.timer_start)
-    remaining = max(0, 10 - elapsed)  # 10-second timer
-    st.progress(remaining / 10)
-    st.caption(f"⏳ {remaining} seconds left")
-
-    # Auto-advance if time runs out
-    if remaining == 0:
-        st.session_state.answers[q_index] = None
-        st.session_state.timer_start = time.time()
-        st.session_state.current_q += 1
-        if st.session_state.current_q >= total_qs:
-            st.session_state.quiz_finished = True
-        st.rerun()
-
-    # Show question
-    st.subheader(f"Question {q_index + 1} of {total_qs}")
-    st.write(question_data["question"])
-
-    # Show options as buttons
-    for opt in question_data["options"]:
-        if st.button(opt, key=f"{q_index}_{opt}"):
-            st.session_state.answers[q_index] = opt
-            st.session_state.timer_start = time.time()
-            st.session_state.current_q += 1
-            if st.session_state.current_q >= total_qs:
-                st.session_state.quiz_finished = True
-            st.rerun()
-
-
-# ---------- MAIN APP FLOW ----------
 
 
 
