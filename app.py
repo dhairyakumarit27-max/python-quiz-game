@@ -8,22 +8,20 @@ from gspread.exceptions import SpreadsheetNotFound
 from google.oauth2.service_account import Credentials
 
 # ---------- QUIZ UI SETUP + THEME ----------
-
-# Force custom theme
 def apply_custom_theme():
     st.markdown(
         """
         <style>
+        /* General app styling */
         body, .stApp {
             background-color: #FFFFFF; /* White background */
-            color: #000000;           /* Black text */
+            color: #000000;            /* Black text */
         }
-        .stRadio label, .stSelectbox label, .stTextInput label {
-            color: #000000 !important; /* Black labels */
-        }
+
+        /* Standard buttons (Next, Submit) */
         .stButton>button {
             background-color: #4B9CD3; /* Blue button */
-            color: #FFFFFF;           /* White button text */
+            color: #FFFFFF;            /* White button text */
             border-radius: 8px;
             border: none;
             padding: 0.5em 1em;
@@ -32,13 +30,34 @@ def apply_custom_theme():
         .stButton>button:hover {
             background-color: #357ABD; /* Darker blue on hover */
         }
+
+        /* Quiz option cards */
+        .quiz-option {
+            border: 2px solid #4B9CD3;
+            border-radius: 12px;
+            padding: 1em;
+            margin: 0.5em 0;
+            cursor: pointer;
+            background-color: #F9F9F9;
+            transition: all 0.2s ease-in-out;
+        }
+        .quiz-option:hover {
+            background-color: #E6F0FA;
+            border-color: #357ABD;
+        }
+        .quiz-option.selected {
+            background-color: #4B9CD3;
+            color: #FFFFFF;
+            font-weight: bold;
+        }
         </style>
         """,
         unsafe_allow_html=True
     )
 
-# Apply theme right away
+# Apply theme
 apply_custom_theme()
+
 
 # Quiz UI
 st.title("🧠 Fun Quiz Game")
@@ -47,13 +66,32 @@ def show_question(question_data, q_index, total_qs):
     st.subheader(f"Question {q_index + 1} of {total_qs}")
     st.write(question_data["question"])
 
-    choice = st.radio(
-        "Select an answer:",
-        question_data["options"],
-        index=None,
-        key=f"q_{q_index}"
-    )
-    return choice
+    # Track selection
+    if f"q_{q_index}" not in st.session_state:
+        st.session_state[f"q_{q_index}"] = None
+
+    selected = st.session_state[f"q_{q_index}"]
+
+    # Display options as clickable cards
+    for opt in question_data["options"]:
+        if st.button(opt, key=f"{q_index}_{opt}"):
+            st.session_state[f"q_{q_index}"] = opt
+            selected = opt
+
+        # Highlight selected option
+        if selected == opt:
+            st.markdown(
+                f"<div class='quiz-option selected'>{opt}</div>",
+                unsafe_allow_html=True
+            )
+        else:
+            st.markdown(
+                f"<div class='quiz-option'>{opt}</div>",
+                unsafe_allow_html=True
+            )
+
+    return selected
+
 
 # ---------- Google Sheets client helper ----------
 def get_gspread_client():
