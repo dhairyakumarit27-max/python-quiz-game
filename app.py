@@ -58,39 +58,80 @@ def apply_custom_theme():
 # Apply theme
 apply_custom_theme()
 
-
-# Quiz UI
+# ---------- QUIZ UI SETUP ----------
 st.title("🧠 Fun Quiz Game")
 
 def show_question(question_data, q_index, total_qs):
+    # ---------- QUIZ UI SETUP ----------
+from streamlit_autorefresh import st_autorefresh
+
+# Auto refresh every 1 second so timer & questions update automatically
+st_autorefresh(interval=1000, key="quiz_refresh")
+
+def show_question(question_data, q_index, total_qs):
+    # Initialize session state
+    if "current_q" not in st.session_state:
+        st.session_state.current_q = 0
+    if "time_left" not in st.session_state:
+        st.session_state.time_left = 30  # 30 sec per question
+    if "quiz_finished" not in st.session_state:
+        st.session_state.quiz_finished = False
+    if "answers" not in st.session_state:
+        st.session_state.answers = {}
+
+    # If quiz is finished, stop here (leaderboard will show elsewhere)
+    if st.session_state.quiz_finished:
+        return None
+
+    # Show question text
     st.subheader(f"Question {q_index + 1} of {total_qs}")
     st.write(question_data["question"])
 
-    # Track selection
-    if f"q_{q_index}" not in st.session_state:
-        st.session_state[f"q_{q_index}"] = None
-
-    selected = st.session_state[f"q_{q_index}"]
-
-    # Display options as clickable cards
-    for opt in question_data["options"]:
-        if st.button(opt, key=f"{q_index}_{opt}"):
-            st.session_state[f"q_{q_index}"] = opt
-            selected = opt
-
-        # Highlight selected option
-        if selected == opt:
-            st.markdown(
-                f"<div class='quiz-option selected'>{opt}</div>",
-                unsafe_allow_html=True
-            )
+    # Timer logic
+    if st.session_state.time_left > 0:
+        st.session_state.time_left -= 1
+        st.info(f"⏳ Time left: {st.session_state.time_left} seconds")
+    else:
+        # Time up → auto move to next question
+        if st.session_state.current_q + 1 < total_qs:
+            st.session_state.current_q += 1
+            st.session_state.time_left = 30  # reset timer
+            st.rerun()
         else:
-            st.markdown(
-                f"<div class='quiz-option'>{opt}</div>",
-                unsafe_allow_html=True
-            )
+            # No more questions → finish quiz
+            st.session_state.quiz_finished = True
+            st.rerun()
 
+    # Radio options
+    choice = st.radio(
+        "Select an answer:",
+        question_data["options"],
+        index=None,
+        key=f"q_{q_index}"
+    )
+
+    # Save choice if selected
+    if choice is not None:
+        st.session_state.answers[q_index] = choice
+
+    # If user answered before timer ended → auto go next
+    if choice is not None:
+        if st.session_state.current_q + 1 < total_qs:
+            st.session_state.current_q += 1
+            st.session_state.time_left = 30
+            st.rerun()
+        else:
+            st.session_state.quiz_finished = True
+            st.rerun()
+
+    return choice
+# (new code I gave you goes here — auto-timer + auto-next)
+    ...
     return selected
+
+
+# ---------- MAIN APP FLOW ----------
+
 
 
 # ---------- Google Sheets client helper ----------
