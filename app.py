@@ -6,6 +6,8 @@ import gspread
 import pandas as pd
 from gspread.exceptions import SpreadsheetNotFound
 from google.oauth2.service_account import Credentials
+from ai_utils import generate_questions, ask_ai
+
 
 # ---------- QUIZ UI SETUP + THEME ----------
 def apply_custom_theme():
