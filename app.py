@@ -78,6 +78,21 @@ def get_gspread_client():
     client = gspread.authorize(creds)
     return client
 
+# ---------- Groq client helper ----------
+from groq import Groq
+import streamlit as st
+
+@st.cache_resource
+def get_groq_client():
+    """
+    Returns a Groq client using the API key from Streamlit secrets.
+    """
+    api_key = st.secrets.get("GROQ_API_KEY")
+    if not api_key:
+        st.error("Groq API key not found in secrets.toml")
+        st.stop()
+    return Groq(api_key=api_key)
+
 
 # ---------- Open sheet and ensure headers ----------
 def open_sheet(sheet_name="QuizResults"):
