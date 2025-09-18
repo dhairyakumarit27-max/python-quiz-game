@@ -6,7 +6,7 @@ import gspread
 import pandas as pd
 from gspread.exceptions import SpreadsheetNotFound
 from google.oauth2.service_account import Credentials
-from ai_utils import generate_questions, ask_ai
+from ai_utils import ask_ai
 
 
 # ---------- QUIZ UI SETUP + THEME ----------
@@ -308,36 +308,35 @@ else:
     
 # ---------- AI Tools Section ----------
 
+
 st.sidebar.markdown("---")
-menu = ["Quiz", "AI Tools"]
+menu = ["Quiz", "AI Assistant"]
 choice = st.sidebar.selectbox("Menu", menu, index=0)  # Default = Quiz
 
-if choice == "AI Tools":
-    st.header("🤖 AI Tools")
+# Ensure AI chat state survives quiz refresh
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
 
-    tab1, tab2 = st.tabs(["📘 Generate Questions", "💬 Chat Assistant"])
+if choice == "AI Assistant":
+    st.header("🤖 AI Assistant Chatbot")
 
-    # --- Question Generator ---
-    with tab1:
-        st.subheader("Generate Quiz Questions from Text")
-        text_input = st.text_area("Paste text here:")
-        num_q = st.slider("Number of questions", 1, 10, 5)
-        if st.button("Generate Questions"):
-            if text_input.strip():
-                with st.spinner("AI is generating questions..."):
-                    output = generate_questions(text_input, num_q)
-                st.code(output, language="json")
-            else:
-                st.warning("Please paste some text.")
-
-    # --- Chat Assistant ---
-    with tab2:
-        st.subheader("Chat with AI Assistant")
-        user_q = st.text_input("Ask me anything:")
-        if st.button("Ask AI"):
-            if user_q.strip():
-                with st.spinner("Thinking..."):
+    user_q = st.text_input("Ask me anything:", key="chat_input")
+    if st.button("Ask AI", key="chat_button"):
+        if user_q.strip():
+            with st.spinner("Thinking..."):
+                try:
                     answer = ask_ai(user_q)
-                st.success(answer)
-            else:
-                st.warning("Please type a question.")
+                    st.session_state.chat_history.append(("You", user_q))
+                    st.session_state.chat_history.append(("AI", answer))
+                except Exception as e:
+                    st.error(f"AI Error: {e}")
+        else:
+            st.warning("Please type a question.")
+
+    # Display chat history (persistent)
+    for sender, msg in st.session_state.chat_history:
+        if sender == "You":
+            st.markdown(f"**🧑 You:** {msg}")
+        else:
+            st.markdown(f"**🤖 AI:** {msg}")
+
