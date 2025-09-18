@@ -307,7 +307,6 @@ else:
         st.rerun()
     
 # ---------- AI Tools Section ----------
-from ai_utils import generate_questions, ask_ai
 
 st.sidebar.markdown("---")
 menu = ["Quiz", "AI Tools"]
@@ -342,4 +341,3 @@ if choice == "AI Tools":
                 st.success(answer)
             else:
                 st.warning("Please type a question.")
-
