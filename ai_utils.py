@@ -1,13 +1,23 @@
-import os
 from groq import Groq
+import streamlit as st
 
-# Setup Groq client
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+# Cached Groq client
+@st.cache_resource
+def get_groq_client():
+    api_key = st.secrets.get("GROQ_API_KEY")
+    if not api_key:
+        st.error("Groq API key not found in secrets.toml")
+        st.stop()
+    return Groq(api_key=api_key)
 
-# AI Assistant Chatbot
-def ask_ai(query):
-    response = client.chat.completions.create(
-        model="llama-3.1-8b-instant",
-        messages=[{"role": "user", "content": query}],
-    )
-    return response.choices[0].message.content
+# Ask AI helper
+def ask_ai(prompt: str) -> str:
+    client = get_groq_client()
+    try:
+        response = client.chat.completions.create(
+            model="llama3-8b-8192",  # or another model you have
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Error: {e}"
