@@ -313,30 +313,32 @@ st.sidebar.markdown("---")
 menu = ["Quiz", "AI Assistant"]
 choice = st.sidebar.selectbox("Menu", menu, index=0)  # Default = Quiz
 
-# Ensure AI chat state survives quiz refresh
+# Make sure chat history persists and is isolated from quiz refresh
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
 if choice == "AI Assistant":
     st.header("🤖 AI Assistant Chatbot")
 
-    user_q = st.text_input("Ask me anything:", key="chat_input")
-    if st.button("Ask AI", key="chat_button"):
+    # Unique keys so quiz refresh doesn’t clash
+    user_q = st.text_input("Ask me anything:", key="ai_chat_input")
+    if st.button("Ask AI", key="ai_chat_button"):
         if user_q.strip():
             with st.spinner("Thinking..."):
                 try:
                     answer = ask_ai(user_q)
-                    st.session_state.chat_history.append(("You", user_q))
-                    st.session_state.chat_history.append(("AI", answer))
+                    st.session_state.chat_history.append(("🧑 You", user_q))
+                    st.session_state.chat_history.append(("🤖 AI", answer))
                 except Exception as e:
                     st.error(f"AI Error: {e}")
         else:
             st.warning("Please type a question.")
 
-    # Display chat history (persistent)
-    for sender, msg in st.session_state.chat_history:
-        if sender == "You":
-            st.markdown(f"**🧑 You:** {msg}")
-        else:
-            st.markdown(f"**🤖 AI:** {msg}")
+    # --- Clear chat option ---
+    if st.button("Clear Chat", key="ai_clear_chat"):
+        st.session_state.chat_history = []
+
+    # Show chat history (newest first, reversed)
+    for sender, msg in reversed(st.session_state.chat_history):
+        st.markdown(f"**{sender}:** {msg}")
 
