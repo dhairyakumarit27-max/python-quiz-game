@@ -303,3 +303,41 @@ else:
         st.session_state.score_saved = False
         st.session_state.feedback = None
         st.rerun()
+    
+# ---------- AI Tools Section ----------
+from ai_utils import generate_questions, ask_ai
+
+st.sidebar.markdown("---")
+menu = ["Quiz", "AI Tools"]
+choice = st.sidebar.selectbox("Menu", menu, index=0)  # Default = Quiz
+
+if choice == "AI Tools":
+    st.header("🤖 AI Tools")
+
+    tab1, tab2 = st.tabs(["📘 Generate Questions", "💬 Chat Assistant"])
+
+    # --- Question Generator ---
+    with tab1:
+        st.subheader("Generate Quiz Questions from Text")
+        text_input = st.text_area("Paste text here:")
+        num_q = st.slider("Number of questions", 1, 10, 5)
+        if st.button("Generate Questions"):
+            if text_input.strip():
+                with st.spinner("AI is generating questions..."):
+                    output = generate_questions(text_input, num_q)
+                st.code(output, language="json")
+            else:
+                st.warning("Please paste some text.")
+
+    # --- Chat Assistant ---
+    with tab2:
+        st.subheader("Chat with AI Assistant")
+        user_q = st.text_input("Ask me anything:")
+        if st.button("Ask AI"):
+            if user_q.strip():
+                with st.spinner("Thinking..."):
+                    answer = ask_ai(user_q)
+                st.success(answer)
+            else:
+                st.warning("Please type a question.")
+
