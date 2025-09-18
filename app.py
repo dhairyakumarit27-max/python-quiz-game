@@ -307,26 +307,31 @@ else:
         st.rerun()
     
 # ---------- AI Tools Section ----------
-
-
 st.sidebar.markdown("---")
-menu = ["Quiz", "AI Assistant"]
+menu = ["Quiz", "AI Assistant (Side Chat)"]
 choice = st.sidebar.selectbox("Menu", menu, index=0)  # Default = Quiz
 
-# Make sure chat history persists and is isolated from quiz refresh
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
+# Create a 2-column layout
+quiz_col, ai_col = st.columns([2, 1])
 
-if choice == "AI Assistant":
+with quiz_col:
+    # Everything quiz-related already above will render here
+    pass  # (quiz logic already executed in main part)
+
+with ai_col:
     st.header("🤖 AI Assistant Chatbot")
 
-    # Unique keys so quiz refresh doesn’t clash
-    user_q = st.text_input("Ask me anything:", key="ai_chat_input")
+    # Ensure chat history persists
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+
+    # User input box
+    user_q = st.text_input("Ask me anything:", key="ai_chat_input", label_visibility="collapsed")
     if st.button("Ask AI", key="ai_chat_button"):
         if user_q.strip():
             with st.spinner("Thinking..."):
                 try:
-                    answer = ask_ai(user_q)
+                    answer = ask_ai(user_q)  # from ai_utils.py
                     st.session_state.chat_history.append(("🧑 You", user_q))
                     st.session_state.chat_history.append(("🤖 AI", answer))
                 except Exception as e:
@@ -334,11 +339,11 @@ if choice == "AI Assistant":
         else:
             st.warning("Please type a question.")
 
-    # --- Clear chat option ---
-    if st.button("Clear Chat", key="ai_clear_chat"):
+    # Clear chat button
+    if st.button("🧹 Clear Chat", key="ai_clear_chat"):
         st.session_state.chat_history = []
 
-    # Show chat history (newest first, reversed)
-    for sender, msg in reversed(st.session_state.chat_history):
+    # Display chat history in correct order (oldest → newest)
+    for sender, msg in st.session_state.chat_history:
         st.markdown(f"**{sender}:** {msg}")
 
