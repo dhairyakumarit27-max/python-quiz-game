@@ -79,11 +79,15 @@ quiz_data = {
         {"question": "5 + 3 = ?", "options": ["6", "7", "8", "9"], "answer": "8"},
         {"question": "10 - 6 = ?", "options": ["2", "4", "6", "8"], "answer": "4"},
         {"question": "3 × 3 = ?", "options": ["6", "9", "12", "15"], "answer": "9"},
+        {"question": "5 + 3 = ?", "options": ["6", "7", "8", "9"], "answer": "8"},
+        {"question": "12 ÷ 4 = ?", "options": ["2", "3", "4", "5"], "answer": "3"},
     ],
     "Science": [
         {"question": "H2O is?", "options": ["Water", "Oxygen", "Hydrogen", "Salt"], "answer": "Water"},
         {"question": "Earth revolves around?", "options": ["Moon", "Mars", "Sun", "Venus"], "answer": "Sun"},
         {"question": "Force unit?", "options": ["Newton", "Joule", "Watt", "Volt"], "answer": "Newton"},
+        {"question": "What planet is known as the Red Planet?", "options": ["Earth", "Mars", "Jupiter", "Venus"], "answer": "Mars"},
+        {"question": "H2O is the chemical formula for what?", "options": ["Oxygen", "Hydrogen", "Water", "Carbon dioxide"], "answer": "Water"},
     ]
 }
 # --- QUIZ DATA END ---
@@ -168,14 +172,18 @@ def run_quiz():
             if elapsed > 10:
                 st.warning("⏰ Time’s up! No points awarded.")
             elif choice == q["answer"]:
-                st.success("✅ Correct!")
-                st.session_state.score += 1
+                 st.success("✅ Correct!")
+                 st.session_state.score += 1
             else:
-                st.error(f"❌ Wrong! Correct answer: {q['answer']}")
+                 st.error(f"❌ Wrong! Correct answer: {q['answer']}")
+
+# --- delay before moving to next question ---
+            time.sleep(2)   # show feedback for 2 seconds
 
             st.session_state.q_index += 1
             st.session_state.start_time = None
             st.rerun()
+
 
     else:
         st.success(f"🏆 Quiz Over! {st.session_state.user['name']}, "
