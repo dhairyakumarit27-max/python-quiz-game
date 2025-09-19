@@ -7,33 +7,28 @@ import pandas as pd
 from gspread.exceptions import SpreadsheetNotFound
 from google.oauth2.service_account import Credentials
 from ai_utils import ask_ai
-
+from streamlit_autorefresh import st_autorefresh
 
 # ---------- QUIZ UI SETUP + THEME ----------
 def apply_custom_theme():
     st.markdown(
         """
         <style>
-        /* General app styling */
         body, .stApp {
-            background-color: #FFFFFF; /* White background */
-            color: #000000;            /* Black text */
+            background-color: #FFFFFF;
+            color: #000000;
         }
-
-        /* Standard buttons (Next, Submit) */
         .stButton>button {
-            background-color: #4B9CD3; /* Blue button */
-            color: #FFFFFF;            /* White button text */
+            background-color: #4B9CD3;
+            color: #FFFFFF;
             border-radius: 8px;
             border: none;
             padding: 0.5em 1em;
             font-weight: bold;
         }
         .stButton>button:hover {
-            background-color: #357ABD; /* Darker blue on hover */
+            background-color: #357ABD;
         }
-
-        /* Quiz option cards */
         .quiz-option {
             border: 2px solid #4B9CD3;
             border-radius: 12px;
@@ -57,20 +52,10 @@ def apply_custom_theme():
         unsafe_allow_html=True
     )
 
-# Apply theme
 apply_custom_theme()
-
-# ---------- QUIZ UI SETUP ----------
-
-st.title("🧠 Fun Quiz Game")
-
-
 
 # ---------- Google Sheets client helper ----------
 def get_gspread_client():
-    """
-    Returns a gspread client using Streamlit secrets.
-    """
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive"
@@ -80,32 +65,14 @@ def get_gspread_client():
     client = gspread.authorize(creds)
     return client
 
-# ---------- Groq client helper ----------
-from groq import Groq
-import streamlit as st
-
-@st.cache_resource
-def get_groq_client():
-    """
-    Returns a Groq client using the API key from Streamlit secrets.
-    """
-    api_key = st.secrets.get("GROQ_API_KEY")
-    if not api_key:
-        st.error("Groq API key not found in secrets.toml")
-        st.stop()
-    return Groq(api_key=api_key)
-
-
-# ---------- Open sheet and ensure headers ----------
 def open_sheet(sheet_name="QuizResults"):
     client = get_gspread_client()
     try:
         sh = client.open(sheet_name)
     except SpreadsheetNotFound:
-        st.error(f"Spreadsheet '{sheet_name}' not found. Create it and share with the service account email.")
+        st.error(f"Spreadsheet '{sheet_name}' not found. Share it with your service account email.")
         st.stop()
-    worksheet = sh.sheet1
-    return worksheet
+    return sh.sheet1
 
 def ensure_headers(worksheet):
     headers = ["Name", "Email", "Category", "Score"]
@@ -146,17 +113,21 @@ if "rerun_trigger" not in st.session_state:
 def trigger_rerun():
     st.session_state.rerun_trigger = not st.session_state.rerun_trigger
 
-# ---------- UI / App ----------
-st.set_page_config(page_title="Quiz Championship", layout="centered")
+# ---------- Layout ----------
+st.set_page_config(page_title="Quiz Championship", layout="wide")
+
 st.sidebar.title("📜 Quiz Rules")
 st.sidebar.write("""
-- Enter **Name & Email** to register  
-- Choose a category or **All Subjects**  
-- **10 seconds** allowed per question (time checked at submission)  
-- Scores are saved to Google Sheets and top 5 leaderboard shown
+- Enter **Name & Email** to register    
+- Choose a category or **All Subjects**    
+- **10 seconds** per question    
+- Scores saved to Google Sheets  
 """)
 
-# Registration
+# Checkbox to toggle chatbot
+show_chatbot = st.sidebar.checkbox("🤖 Show AI Assistant", value=False)
+
+# ---------- Player Registration ----------
 if "user" not in st.session_state:
     st.session_state.user = None
 
@@ -175,72 +146,57 @@ if not st.session_state.user:
             st.error("Please provide both Name and Email.")
     st.stop()
 
-# User registered
-st.title("🎯 Professional Quiz Championship")
-category = st.selectbox("Choose a Category", list(quiz_data.keys()) + ["All Subjects"])
+# ---------- Two-column layout ----------
+col1, col2 = st.columns([2, 1])
 
-# Prepare questions for chosen category
-if "questions" not in st.session_state or st.session_state.get("active_category") != category:
-    if category == "All Subjects":
-        all_q = []
-        for v in quiz_data.values():
-            all_q.extend(v)
-        st.session_state.questions = random.sample(all_q, len(all_q))
-    else:
-        st.session_state.questions = random.sample(quiz_data[category], len(quiz_data[category]))
-    st.session_state.active_category = category
-    st.session_state.q_index = 0
-    st.session_state.score = 0
-    st.session_state.start_time = None
+with col1:
+    st.title("🎯 Professional Quiz Championship")
 
-questions = st.session_state.questions
+    category = st.selectbox("Choose a Category", list(quiz_data.keys()) + ["All Subjects"])
 
-# ---------- Show question or final screen (REPLACEMENT: quiz left, AI right) ----------
-# Create a 2-column layout: quiz (2/3) | AI assistant (1/3)
-quiz_col, ai_col = st.columns([2, 1])
+    # Load questions
+    if "questions" not in st.session_state or st.session_state.get("active_category") != category:
+        if category == "All Subjects":
+            all_q = []
+            for v in quiz_data.values():
+                all_q.extend(v)
+            st.session_state.questions = random.sample(all_q, len(all_q))
+        else:
+            st.session_state.questions = random.sample(quiz_data[category], len(quiz_data[category]))
+        st.session_state.active_category = category
+        st.session_state.q_index = 0
+        st.session_state.score = 0
+        st.session_state.start_time = None
 
-# ----------------- LEFT: QUIZ (auto-refresh only here) -----------------
-with quiz_col:
-    # Autorefresh only in the quiz column so AI panel doesn't rerun
-    from streamlit_autorefresh import st_autorefresh
+    questions = st.session_state.questions
+
+    # Timer refresh
     st_autorefresh(interval=1000, key="quiz_refresh")
 
-    # Show feedback message if exists
     if "feedback" in st.session_state and st.session_state.feedback:
         msg, type_ = st.session_state.feedback
-        if type_ == "success":
-            st.success(msg)
-        elif type_ == "error":
-            st.error(msg)
-        elif type_ == "info":
-            st.info(msg)
-        st.session_state.feedback = None  # clear after showing
+        getattr(st, type_)(msg)
+        st.session_state.feedback = None
 
-    # Quiz running
     if st.session_state.q_index < len(questions):
         q = questions[st.session_state.q_index]
         st.subheader(f"Question {st.session_state.q_index + 1} of {len(questions)}")
         st.write(q["question"])
 
-        # Start timer if not set
         if st.session_state.start_time is None:
             st.session_state.start_time = time.time()
 
-        # Countdown
         time_left = 10 - int(time.time() - st.session_state.start_time)
         st.markdown(f"**⏱ Time left:** {max(time_left, 0)} seconds")
 
-        # If time runs out
         if time_left <= 0:
             st.session_state.feedback = ("⏰ Time’s up! No points awarded.", "error")
             st.session_state.q_index += 1
             st.session_state.start_time = None
             st.rerun()
 
-        # Show options
         choice = st.radio("Options", q["options"], key=f"opt_{st.session_state.q_index}")
 
-        # Submit answer button
         if st.button("Submit Answer", key=f"submit_{st.session_state.q_index}"):
             elapsed = time.time() - st.session_state.start_time
             if elapsed > 10:
@@ -251,17 +207,13 @@ with quiz_col:
             else:
                 st.session_state.feedback = (f"❌ Wrong! Correct answer: {q['answer']}", "error")
 
-            # Move to next question
             st.session_state.q_index += 1
             st.session_state.start_time = None
             st.rerun()
 
     else:
-        # Quiz finished
-        st.success(f"🏆 Quiz Over! {st.session_state.user['name']}, "
-                   f"your score: {st.session_state.score}/{len(questions)}")
+        st.success(f"🏆 Quiz Over! {st.session_state.user['name']}, score: {st.session_state.score}/{len(questions)}")
 
-        # Save score only once
         if "score_saved" not in st.session_state:
             st.session_state.score_saved = False
             st.session_state.worksheet_cache = None
@@ -282,10 +234,8 @@ with quiz_col:
             except Exception as e:
                 st.error(f"Error saving score: {e}")
 
-        # Use cached worksheet for leaderboard
         worksheet = st.session_state.worksheet_cache or open_sheet("QuizResults")
 
-        # Show leaderboard
         st.subheader("🏅 Top 5 Players")
         try:
             records = worksheet.get_all_records()
@@ -302,7 +252,6 @@ with quiz_col:
         except Exception as e:
             st.error(f"Error loading leaderboard: {e}")
 
-        # Restart button
         if st.button("Play Again"):
             st.session_state.q_index = 0
             st.session_state.score = 0
@@ -311,39 +260,29 @@ with quiz_col:
             st.session_state.feedback = None
             st.rerun()
 
-# ----------------- RIGHT: AI Assistant (no autorefresh here) -----------------
-with ai_col:
-    st.header("🤖 AI Assistant Chatbot")
-
-    # Ensure chat history exists (persist across reruns)
+# ---------- AI Assistant ----------
+with col2:
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
 
-    # Use text_area so typing doesn't clear on rerun
-    user_q = st.text_area("Ask me anything:", key="ai_chat_box", placeholder="Type a question for the AI assistant...")
+    if show_chatbot:
+        st.header("🤖 AI Assistant Chatbot")
 
-    if st.button("Ask AI", key="ai_chat_button"):
-        if user_q.strip():
-            with st.spinner("Thinking..."):
-                try:
-                    # ask_ai is from ai_utils.py (uses Groq)
-                    answer = ask_ai(user_q)
-                    # store both messages; newest will be displayed first (we will reverse when rendering)
-                    st.session_state.chat_history.append(("You", user_q))
-                    st.session_state.chat_history.append(("AI", answer))
-                except Exception as e:
-                    st.error(f"AI Error: {e}")
-        else:
-            st.warning("Please type a question.")
-
-    # Clear chat
-    if st.button("🧹 Clear Chat", key="ai_clear_chat"):
-        st.session_state.chat_history = []
-
-    # Display chat history newest first (reverse)
-    if st.session_state.chat_history:
-        for sender, msg in reversed(st.session_state.chat_history):
-            if sender == "You":
-                st.markdown(f"**🧑 You:** {msg}")
+        user_q = st.text_input("Ask me anything:", key="ai_chat_input")
+        if st.button("Ask AI", key="ai_chat_button"):
+            if user_q.strip():
+                with st.spinner("Thinking..."):
+                    try:
+                        answer = ask_ai(user_q)
+                        st.session_state.chat_history.append(("🧑 You", user_q))
+                        st.session_state.chat_history.append(("🤖 AI", answer))
+                    except Exception as e:
+                        st.error(f"AI Error: {e}")
             else:
-                st.markdown(f"**🤖 AI:** {msg}")
+                st.warning("Please type a question.")
+
+        if st.button("Clear Chat", key="ai_clear_chat"):
+            st.session_state.chat_history = []
+
+        for sender, msg in reversed(st.session_state.chat_history):
+            st.markdown(f"**{sender}:** {msg}")
