@@ -195,155 +195,155 @@ if "questions" not in st.session_state or st.session_state.get("active_category"
 
 questions = st.session_state.questions
 
-# ---------- Show question or final screen ----------
-from streamlit_autorefresh import st_autorefresh
-
-# Auto-refresh every 1 second (for timer countdown)
-st_autorefresh(interval=1000, key="quiz_refresh")
-
-# Show feedback message if exists
-if "feedback" in st.session_state and st.session_state.feedback:
-    msg, type_ = st.session_state.feedback
-    if type_ == "success":
-        st.success(msg)
-    elif type_ == "error":
-        st.error(msg)
-    elif type_ == "info":
-        st.info(msg)
-    st.session_state.feedback = None  # clear after showing
-
-if st.session_state.q_index < len(questions):
-    q = questions[st.session_state.q_index]
-    st.subheader(f"Question {st.session_state.q_index + 1} of {len(questions)}")
-    st.write(q["question"])
-
-    # Start timer if not set
-    if st.session_state.start_time is None:
-        st.session_state.start_time = time.time()
-
-    # Countdown
-    time_left = 10 - int(time.time() - st.session_state.start_time)
-    st.markdown(f"**⏱ Time left:** {max(time_left, 0)} seconds")
-
-    # If time runs out
-    if time_left <= 0:
-        st.session_state.feedback = ("⏰ Time’s up! No points awarded.", "error")
-        st.session_state.q_index += 1
-        st.session_state.start_time = None
-        st.rerun()
-
-    # Show options
-    choice = st.radio("Options", q["options"], key=f"opt_{st.session_state.q_index}")
-
-    # Submit answer button
-    if st.button("Submit Answer", key=f"submit_{st.session_state.q_index}"):
-        elapsed = time.time() - st.session_state.start_time
-        if elapsed > 10:
-            st.session_state.feedback = ("⏰ Time’s up! No points awarded.", "error")
-        elif choice == q["answer"]:
-            st.session_state.feedback = ("✅ Correct!", "success")
-            st.session_state.score += 1
-        else:
-            st.session_state.feedback = (f"❌ Wrong! Correct answer: {q['answer']}", "error")
-
-        # Move to next question
-        st.session_state.q_index += 1
-        st.session_state.start_time = None
-        st.rerun()
-
-else:
-    # Quiz finished
-    st.success(f"🏆 Quiz Over! {st.session_state.user['name']}, "
-               f"your score: {st.session_state.score}/{len(questions)}")
-
-    # Save score only once
-    if "score_saved" not in st.session_state:
-        st.session_state.score_saved = False
-        st.session_state.worksheet_cache = None
-
-    if not st.session_state.score_saved:
-        try:
-            worksheet = open_sheet("QuizResults")
-            ensure_headers(worksheet)
-            worksheet.append_row(
-                [st.session_state.user["name"],
-                 st.session_state.user["email"],
-                 st.session_state.active_category,
-                 st.session_state.score],
-                value_input_option="USER_ENTERED"
-            )
-            st.session_state.worksheet_cache = worksheet
-            st.session_state.score_saved = True
-        except Exception as e:
-            st.error(f"Error saving score: {e}")
-
-    # Use cached worksheet for leaderboard
-    worksheet = st.session_state.worksheet_cache or open_sheet("QuizResults")
-
-    # Show leaderboard
-    st.subheader("🏅 Top 5 Players")
-    try:
-        records = worksheet.get_all_records()
-        if records:
-            df = pd.DataFrame(records)
-            if "Score" in df.columns:
-                df["Score"] = pd.to_numeric(df["Score"], errors="coerce").fillna(0).astype(int)
-                top5 = df.sort_values("Score", ascending=False).head(5)
-                st.table(top5[["Name", "Score", "Category"]])
-            else:
-                st.write(df.head(5))
-        else:
-            st.write("No scores yet.")
-    except Exception as e:
-        st.error(f"Error loading leaderboard: {e}")
-
-    # Restart button
-    if st.button("Play Again"):
-        st.session_state.q_index = 0
-        st.session_state.score = 0
-        st.session_state.start_time = None
-        st.session_state.score_saved = False
-        st.session_state.feedback = None
-        st.rerun()
-    
-# ---------- AI Tools Section ----------
-st.sidebar.markdown("---")
-menu = ["Quiz", "AI Assistant (Side Chat)"]
-choice = st.sidebar.selectbox("Menu", menu, index=0)  # Default = Quiz
-
-# Create a 2-column layout
+# ---------- Show question or final screen (REPLACEMENT: quiz left, AI right) ----------
+# Create a 2-column layout: quiz (2/3) | AI assistant (1/3)
 quiz_col, ai_col = st.columns([2, 1])
 
+# ----------------- LEFT: QUIZ (auto-refresh only here) -----------------
 with quiz_col:
-    # Everything quiz-related already above will render here
-    pass  # (quiz logic already executed in main part)
+    # Autorefresh only in the quiz column so AI panel doesn't rerun
+    from streamlit_autorefresh import st_autorefresh
+    st_autorefresh(interval=1000, key="quiz_refresh")
 
+    # Show feedback message if exists
+    if "feedback" in st.session_state and st.session_state.feedback:
+        msg, type_ = st.session_state.feedback
+        if type_ == "success":
+            st.success(msg)
+        elif type_ == "error":
+            st.error(msg)
+        elif type_ == "info":
+            st.info(msg)
+        st.session_state.feedback = None  # clear after showing
+
+    # Quiz running
+    if st.session_state.q_index < len(questions):
+        q = questions[st.session_state.q_index]
+        st.subheader(f"Question {st.session_state.q_index + 1} of {len(questions)}")
+        st.write(q["question"])
+
+        # Start timer if not set
+        if st.session_state.start_time is None:
+            st.session_state.start_time = time.time()
+
+        # Countdown
+        time_left = 10 - int(time.time() - st.session_state.start_time)
+        st.markdown(f"**⏱ Time left:** {max(time_left, 0)} seconds")
+
+        # If time runs out
+        if time_left <= 0:
+            st.session_state.feedback = ("⏰ Time’s up! No points awarded.", "error")
+            st.session_state.q_index += 1
+            st.session_state.start_time = None
+            st.rerun()
+
+        # Show options
+        choice = st.radio("Options", q["options"], key=f"opt_{st.session_state.q_index}")
+
+        # Submit answer button
+        if st.button("Submit Answer", key=f"submit_{st.session_state.q_index}"):
+            elapsed = time.time() - st.session_state.start_time
+            if elapsed > 10:
+                st.session_state.feedback = ("⏰ Time’s up! No points awarded.", "error")
+            elif choice == q["answer"]:
+                st.session_state.feedback = ("✅ Correct!", "success")
+                st.session_state.score += 1
+            else:
+                st.session_state.feedback = (f"❌ Wrong! Correct answer: {q['answer']}", "error")
+
+            # Move to next question
+            st.session_state.q_index += 1
+            st.session_state.start_time = None
+            st.rerun()
+
+    else:
+        # Quiz finished
+        st.success(f"🏆 Quiz Over! {st.session_state.user['name']}, "
+                   f"your score: {st.session_state.score}/{len(questions)}")
+
+        # Save score only once
+        if "score_saved" not in st.session_state:
+            st.session_state.score_saved = False
+            st.session_state.worksheet_cache = None
+
+        if not st.session_state.score_saved:
+            try:
+                worksheet = open_sheet("QuizResults")
+                ensure_headers(worksheet)
+                worksheet.append_row(
+                    [st.session_state.user["name"],
+                     st.session_state.user["email"],
+                     st.session_state.active_category,
+                     st.session_state.score],
+                    value_input_option="USER_ENTERED"
+                )
+                st.session_state.worksheet_cache = worksheet
+                st.session_state.score_saved = True
+            except Exception as e:
+                st.error(f"Error saving score: {e}")
+
+        # Use cached worksheet for leaderboard
+        worksheet = st.session_state.worksheet_cache or open_sheet("QuizResults")
+
+        # Show leaderboard
+        st.subheader("🏅 Top 5 Players")
+        try:
+            records = worksheet.get_all_records()
+            if records:
+                df = pd.DataFrame(records)
+                if "Score" in df.columns:
+                    df["Score"] = pd.to_numeric(df["Score"], errors="coerce").fillna(0).astype(int)
+                    top5 = df.sort_values("Score", ascending=False).head(5)
+                    st.table(top5[["Name", "Score", "Category"]])
+                else:
+                    st.write(df.head(5))
+            else:
+                st.write("No scores yet.")
+        except Exception as e:
+            st.error(f"Error loading leaderboard: {e}")
+
+        # Restart button
+        if st.button("Play Again"):
+            st.session_state.q_index = 0
+            st.session_state.score = 0
+            st.session_state.start_time = None
+            st.session_state.score_saved = False
+            st.session_state.feedback = None
+            st.rerun()
+
+# ----------------- RIGHT: AI Assistant (no autorefresh here) -----------------
 with ai_col:
     st.header("🤖 AI Assistant Chatbot")
 
-    # Ensure chat history persists
+    # Ensure chat history exists (persist across reruns)
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
 
-    # User input box
-    user_q = st.text_input("Ask me anything:", key="ai_chat_input", label_visibility="collapsed")
+    # Use text_area so typing doesn't clear on rerun
+    user_q = st.text_area("Ask me anything:", key="ai_chat_box", placeholder="Type a question for the AI assistant...")
+
     if st.button("Ask AI", key="ai_chat_button"):
         if user_q.strip():
             with st.spinner("Thinking..."):
                 try:
-                    answer = ask_ai(user_q)  # from ai_utils.py
-                    st.session_state.chat_history.append(("🧑 You", user_q))
-                    st.session_state.chat_history.append(("🤖 AI", answer))
+                    # ask_ai is from ai_utils.py (uses Groq)
+                    answer = ask_ai(user_q)
+                    # store both messages; newest will be displayed first (we will reverse when rendering)
+                    st.session_state.chat_history.append(("You", user_q))
+                    st.session_state.chat_history.append(("AI", answer))
                 except Exception as e:
                     st.error(f"AI Error: {e}")
         else:
             st.warning("Please type a question.")
 
-    # Clear chat button
+    # Clear chat
     if st.button("🧹 Clear Chat", key="ai_clear_chat"):
         st.session_state.chat_history = []
 
-    # Display chat history in correct order (oldest → newest)
-    for sender, msg in st.session_state.chat_history:
-        st.markdown(f"**{sender}:** {msg}")
-
+    # Display chat history newest first (reverse)
+    if st.session_state.chat_history:
+        for sender, msg in reversed(st.session_state.chat_history):
+            if sender == "You":
+                st.markdown(f"**🧑 You:** {msg}")
+            else:
+                st.markdown(f"**🤖 AI:** {msg}")
