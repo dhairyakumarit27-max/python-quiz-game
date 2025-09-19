@@ -172,20 +172,16 @@ def run_quiz():
               st.session_state.score += 1
               st.success("✅ Correct!")
            else:
-             st.error(f"❌ Wrong! Correct answer: {q['answer']}")
+              st.error(f"❌ Wrong! Correct answer: {q['answer']}")
 
-    # --- skip waiting for timer ---
-           st.session_state.timer = 0
-           st.session_state.q_index += 1
-           st.rerun()
+    # --- pause to show feedback ---
+          time.sleep(2)
 
+    # --- move to next question ---
+         st.session_state.q_index += 1
+         st.session_state.start_time = None
+         st.rerun()
 
-# --- delay before moving to next question ---
-            time.sleep(2)   # show feedback for 2 seconds
-
-            st.session_state.q_index += 1
-            st.session_state.start_time = None
-            st.rerun()
 
 
     else:
