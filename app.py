@@ -66,7 +66,8 @@ def run_quiz():
             if choice == ans:
                 st.session_state.score += 1
             st.session_state.qn += 1
-            st.experimental_rerun()
+            st.rerun()
+
     else:
         st.success(f"Quiz finished! Your Score: {st.session_state.score}/{len(questions)}")
         save_result(name, st.session_state.score)
@@ -116,7 +117,8 @@ def ai_chatbot():
                 reply = f"Error: {e}"
 
             st.session_state.chat_history.append(("🤖 AI", reply))
-            st.experimental_rerun()
+            st.rerun()
+
 
     # ---------- Show chat in reverse (newest at bottom) ----------
     for role, msg in st.session_state.chat_history:
