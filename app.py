@@ -168,14 +168,17 @@ def run_quiz():
         choice = st.radio("Options", q["options"], key=f"opt_{st.session_state.q_index}")
 
         if st.button("Submit Answer", key=f"submit_{st.session_state.q_index}"):
-            elapsed = time.time() - st.session_state.start_time
-            if elapsed > 10:
-                st.warning("⏰ Time’s up! No points awarded.")
-            elif choice == q["answer"]:
-                 st.success("✅ Correct!")
-                 st.session_state.score += 1
-            else:
-                 st.error(f"❌ Wrong! Correct answer: {q['answer']}")
+           if choice == q["answer"]:
+              st.session_state.score += 1
+              st.success("✅ Correct!")
+           else:
+             st.error(f"❌ Wrong! Correct answer: {q['answer']}")
+
+    # --- skip waiting for timer ---
+           st.session_state.timer = 0
+           st.session_state.q_index += 1
+           st.rerun()
+
 
 # --- delay before moving to next question ---
             time.sleep(2)   # show feedback for 2 seconds
