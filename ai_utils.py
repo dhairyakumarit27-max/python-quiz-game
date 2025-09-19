@@ -1,23 +1,27 @@
-from groq import Groq
+# ai_utils.py
 import streamlit as st
+from groq import Groq
 
-# Cached Groq client
 @st.cache_resource
-def get_groq_client():
+def _get_groq_client():
     api_key = st.secrets.get("GROQ_API_KEY")
     if not api_key:
-        st.error("Groq API key not found in secrets.toml")
-        st.stop()
+        raise RuntimeError("GROQ_API_KEY not found in Streamlit secrets.")
     return Groq(api_key=api_key)
 
-# Ask AI helper
-def ask_ai(prompt: str) -> str:
-    client = get_groq_client()
+def ask_ai(prompt: str, model: str | None = None) -> str:
+    """
+    Ask Groq and return plain text. Uses model from secrets fallback to
+    'llama-3.1-8b-instant' if not present.
+    """
+    client = _get_groq_client()
+    model = model or st.secrets.get("GROQ_MODEL", "llama-3.1-8b-instant")
     try:
-        response = client.chat.completions.create(
-            model="llama3-8b-8192",  # or another model you have
+        resp = client.chat.completions.create(
+            model=model,
             messages=[{"role": "user", "content": prompt}],
         )
-        return response.choices[0].message.content
+        return resp.choices[0].message.content.strip()
     except Exception as e:
+        # Return a readable error string so Streamlit doesn't crash
         return f"Error: {e}"
