@@ -25,11 +25,11 @@ def open_sheet(sheet_name):
     return sheet.worksheet(sheet_name)
 
 def save_result(name, score):
-    worksheet = open_sheet("QuizResults")
+    worksheet = open_sheet("QuizAppDB")
     worksheet.append_row([name, score])
 
 def load_leaderboard():
-    worksheet = open_sheet("QuizResults")
+    worksheet = open_sheet("QuizAppDB")
     data = worksheet.get_all_records()
     return sorted(data, key=lambda x: x["Score"], reverse=True)
 
