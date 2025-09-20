@@ -48,9 +48,9 @@ QUIZ_QUESTIONS = {
     ]
 }
 
-# repeat questions to make at least 7 total
+# Make sure total = 7
 ALL_QUESTIONS = (QUIZ_QUESTIONS["Maths"] + QUIZ_QUESTIONS["Science"]) * 2
-ALL_QUESTIONS = ALL_QUESTIONS[:7]  # ensure exactly 7
+ALL_QUESTIONS = ALL_QUESTIONS[:7]
 
 # ==============================
 # AI Assistant Setup
@@ -76,22 +76,46 @@ def chat_with_ai(user_input, history):
 # Quiz Logic
 # ==============================
 def run_quiz():
-    if "q_index" not in st.session_state:
-        st.session_state.q_index = 0
-        st.session_state.score = 0
-        st.session_state.start_time = None
-        st.session_state.feedback = None
-        st.session_state.move_next = False
+    # Registration
+    if "registered" not in st.session_state:
+        st.session_state.registered = False
 
-    if st.session_state.q_index >= len(ALL_QUESTIONS):
-        st.success(f"🎉 Quiz finished! Your score: {st.session_state.score}/{len(ALL_QUESTIONS)}")
-        name = st.text_input("Enter your name to save your result:")
-        if st.button("Save Result") and name:
-            save_result(name, st.session_state.score)
-            st.success("✅ Result saved!")
+    if not st.session_state.registered:
+        st.subheader("📝 Register to Start Quiz")
+        name = st.text_input("Enter your name:")
+        category = st.selectbox("Choose Category", ["Maths", "Science"])
+        if st.button("Start Quiz"):
+            if name.strip():
+                st.session_state.name = name
+                st.session_state.category = category
+                st.session_state.questions = random.sample(
+                    QUIZ_QUESTIONS[category], min(2, len(QUIZ_QUESTIONS[category]))
+                ) + random.sample(ALL_QUESTIONS, 5)  # total 7
+                random.shuffle(st.session_state.questions)
+                st.session_state.q_index = 0
+                st.session_state.score = 0
+                st.session_state.start_time = None
+                st.session_state.feedback = None
+                st.session_state.registered = True
+                st.rerun()
+            else:
+                st.warning("Please enter your name to continue.")
         return
 
-    q = ALL_QUESTIONS[st.session_state.q_index]
+    # Quiz running
+    if st.session_state.q_index >= len(st.session_state.questions):
+        st.success(f"🎉 Quiz finished! Your score: {st.session_state.score}/{len(st.session_state.questions)}")
+        save_result(st.session_state.name, st.session_state.score)
+
+        st.header("🏆 Leaderboard")
+        try:
+            leaderboard = load_leaderboard()
+            st.table(leaderboard[:5])
+        except Exception as e:
+            st.error(f"Error loading leaderboard: {e}")
+        return
+
+    q = st.session_state.questions[st.session_state.q_index]
 
     # Timer
     if st.session_state.start_time is None:
@@ -103,7 +127,8 @@ def run_quiz():
 
     if remaining <= 0 and not st.session_state.feedback:
         st.session_state.feedback = "⏰ Time’s up! No points awarded."
-        st.session_state.move_next = True
+        st.session_state.q_index += 1
+        st.session_state.start_time = None
         st.rerun()
 
     # Question display
@@ -117,36 +142,34 @@ def run_quiz():
             st.session_state.feedback = "✅ Correct!"
         else:
             st.session_state.feedback = f"❌ Wrong! Correct answer: {q['answer']}"
-        st.session_state.move_next = True
+        st.session_state.q_index += 1
+        st.session_state.start_time = None
         st.rerun()
 
-    # Feedback and auto-move
+    # Feedback
     if st.session_state.feedback:
         st.info(st.session_state.feedback)
         st.session_state.feedback = None
-        if st.session_state.move_next:
-            st.session_state.q_index += 1
-            st.session_state.start_time = None
-            st.session_state.move_next = False
-            st.rerun()
 
 # ==============================
 # Streamlit Layout
 # ==============================
 st.set_page_config(layout="wide")
 
+# Sidebar Rules
+st.sidebar.title("📘 Rules")
+st.sidebar.markdown("""
+- You have **10 seconds** for each question.  
+- Once you submit, the answer is final.  
+- Score is saved to the leaderboard after the quiz.  
+- Be honest & have fun! 🎉
+""")
+
 col1, col2 = st.columns([2, 1])  # 2/3 quiz, 1/3 AI
 
 with col1:
     st.title("🎯 School Quiz Game")
     run_quiz()
-
-    st.header("🏆 Leaderboard")
-    try:
-        leaderboard = load_leaderboard()
-        st.table(leaderboard[:5])
-    except Exception as e:
-        st.error(f"Error loading leaderboard: {e}")
 
 with col2:
     st.title("🤖 AI Assistant")
