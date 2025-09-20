@@ -34,10 +34,17 @@ def open_sheet(worksheet_name="Leaderboard"):
     return worksheet
 
 def save_result(name, score):
-    """Save result directly to Google Sheet (once at quiz end)."""
+    """Save result directly to Google Sheet (once per quiz)."""
+    # ✅ Double-protection: prevent multiple saves
+    if st.session_state.get("save_lock", False):
+        return
+
     worksheet = open_sheet("Leaderboard")
     timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
     worksheet.append_row([str(name), int(score), timestamp])
+
+    # Lock after saving
+    st.session_state.save_lock = True
 
 def load_leaderboard(limit=50):
     """Load leaderboard from Google Sheet."""
@@ -103,7 +110,9 @@ def run_quiz():
     if "registered" not in st.session_state:
         st.session_state.registered = False
     if "result_saved" not in st.session_state:
-        st.session_state.result_saved = False  # ✅ ensure save only once
+        st.session_state.result_saved = False
+    if "save_lock" not in st.session_state:
+        st.session_state.save_lock = False
 
     if not st.session_state.registered:
         st.subheader("📝 Register to Start Quiz")
@@ -119,6 +128,7 @@ def run_quiz():
                 st.session_state.start_time = None
                 st.session_state.feedback = None
                 st.session_state.result_saved = False
+                st.session_state.save_lock = False  # reset lock
                 st.session_state.registered = True
                 st.rerun()
             else:
@@ -129,8 +139,8 @@ def run_quiz():
     if st.session_state.q_index >= len(st.session_state.questions):
         st.success(f"🎉 Quiz finished! Your score: {st.session_state.score}/{len(st.session_state.questions)}")
 
-        # ✅ Save result only once, when quiz is over
-        if not st.session_state.result_saved:
+        # ✅ Save result only once
+        if not st.session_state.result_saved and not st.session_state.save_lock:
             try:
                 save_result(st.session_state.name, st.session_state.score)
                 st.session_state.result_saved = True
@@ -150,6 +160,7 @@ def run_quiz():
         if st.button("Play Again"):
             st.session_state.registered = False
             st.session_state.result_saved = False
+            st.session_state.save_lock = False
             st.rerun()
         return
 
@@ -163,7 +174,6 @@ def run_quiz():
 
     st.write(f"⏳ Time left: {remaining} sec")
 
-    # Auto-refresh every second while question is active
     if remaining > 0:
         st_autorefresh(interval=1000, key=f"refresh_{st.session_state.q_index}")
 
