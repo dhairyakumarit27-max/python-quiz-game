@@ -6,16 +6,12 @@ import gspread
 from google.oauth2.service_account import Credentials
 from groq import Groq
 from datetime import datetime
+from streamlit_autorefresh import st_autorefresh
 
 # ==============================
 # Google Sheets Setup (robust)
 # ==============================
 def get_gspread_client():
-    """
-    Create a gspread client from service account JSON stored in Streamlit secrets.
-    Expects st.secrets["GOOGLE_CREDENTIALS"] to be a JSON string.
-    Expects optional st.secrets["GSHEET_NAME"] for the spreadsheet file name.
-    """
     creds_dict = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
     creds = Credentials.from_service_account_info(
         creds_dict,
@@ -25,61 +21,39 @@ def get_gspread_client():
     return gspread.authorize(creds)
 
 def open_sheet(worksheet_name="Leaderboard"):
-    """
-    Open the Spreadsheet workbook named by st.secrets["GSHEET_NAME"] (fallback "QuizAppDB"),
-    then return a worksheet object for worksheet_name. If that worksheet doesn't exist,
-    create it and add a header row ["Name","Score","Timestamp"].
-    This prevents WorksheetNotFound errors.
-    """
     client = get_gspread_client()
     workbook_name = st.secrets.get("GSHEET_NAME", "QuizAppDB")
     try:
         book = client.open(workbook_name)
     except Exception as e:
-        # Try creating the spreadsheet (may require Drive API permissions)
-        # If creation fails, raise a helpful error.
         try:
             book = client.create(workbook_name)
         except Exception as ce:
             raise RuntimeError(
                 f"Unable to open or create workbook '{workbook_name}'. "
-                f"Original error: {e}. Create the spreadsheet manually or check service account permissions."
+                f"Original error: {e}"
             ) from ce
 
-    # Try to get the worksheet, else create it with a header row
     try:
         worksheet = book.worksheet(worksheet_name)
     except gspread.exceptions.WorksheetNotFound:
         worksheet = book.add_worksheet(title=worksheet_name, rows="100", cols="10")
-        # Add header row so get_all_records() returns dicts with keys
         worksheet.append_row(["Name", "Score", "Timestamp"])
     return worksheet
 
 def save_result(name, score):
-    """
-    Append a result row to the leaderboard worksheet.
-    Ensures header exists and then appends Name, Score, Timestamp.
-    """
     worksheet = open_sheet("Leaderboard")
     timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
     worksheet.append_row([name, int(score), timestamp])
 
 def load_leaderboard(limit=50):
-    """
-    Load leaderboard records as list of dicts and sort by 'Score' (descending).
-    Returns top `limit` rows.
-    """
     worksheet = open_sheet("Leaderboard")
-    data = worksheet.get_all_records()  # requires header row: Name, Score, Timestamp
-    # Defensive: if 'Score' not present, return empty list
-    if not data:
-        return []
-    if "Score" not in data[0]:
+    data = worksheet.get_all_records()
+    if not data or "Score" not in data[0]:
         return []
     try:
         return sorted(data, key=lambda x: int(x.get("Score", 0)), reverse=True)[:limit]
     except Exception:
-        # In case Score can't be converted to int for some rows
         return sorted(data, key=lambda x: float(x.get("Score", 0) or 0), reverse=True)[:limit]
 
 # ==============================
@@ -143,19 +117,17 @@ def run_quiz():
             if name.strip():
                 st.session_state.name = name.strip()
                 st.session_state.category = category
-                # store 5 random questions for this session
                 st.session_state.questions = random.sample(QUIZ_QUESTIONS[category], 5)
                 st.session_state.q_index = 0
                 st.session_state.score = 0
                 st.session_state.start_time = None
                 st.session_state.feedback = None
                 st.session_state.registered = True
-                # ensure leaderboard worksheet exists early
                 try:
                     open_sheet("Leaderboard")
                 except Exception as e:
                     st.error(f"Warning: couldn't ensure leaderboard exists: {e}")
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.warning("Please enter your name to continue.")
         return
@@ -163,8 +135,6 @@ def run_quiz():
     # --- Quiz Finished ---
     if st.session_state.q_index >= len(st.session_state.questions):
         st.success(f"🎉 Quiz finished! Your score: {st.session_state.score}/{len(st.session_state.questions)}")
-
-        # Save result (wrapped in try/except to avoid crashing the app if Sheets fail)
         try:
             save_result(st.session_state.name, st.session_state.score)
         except Exception as e:
@@ -179,60 +149,36 @@ def run_quiz():
                 st.info("Leaderboard is empty.")
         except Exception as e:
             st.error(f"Error loading leaderboard: {e}")
-        # Offer restart
         if st.button("Play Again"):
-            # reset registration to allow new run
             st.session_state.registered = False
-            st.experimental_rerun()
+            st.rerun()
         return
 
     # --- Current Question ---
     q = st.session_state.questions[st.session_state.q_index]
-
-    # Initialize timer for this question
     if st.session_state.get("start_time") is None:
         st.session_state.start_time = time.time()
-        # clear any previous selected option for radio by re-creating key
-        # Note: radio's key uses question index, so it's unique per question
 
-    # Remaining time calculation
     elapsed = int(time.time() - st.session_state.start_time)
     remaining = max(0, 10 - elapsed)
 
-    # Display time in a visually stable place
-    timer_placeholder = st.empty()
-    timer_placeholder.write(f"⏳ Time left: {remaining} sec")
+    st.write(f"⏳ Time left: {remaining} sec")
 
-    # Auto-move when time up (and avoid double increment)
+    # Auto-refresh every second while question is active
+    if remaining > 0:
+        st_autorefresh(interval=1000, key=f"refresh_{st.session_state.q_index}")
+
     if remaining <= 0 and not st.session_state.get("feedback"):
         st.session_state.feedback = "⏰ Time’s up! No points awarded."
         st.session_state.q_index += 1
         st.session_state.start_time = None
-        # immediate rerun so the UI updates to next question
-        st.experimental_rerun()
-
-    # Auto-refresh the page roughly every second so timer updates without clicks.
-    # This uses Streamlit's query-params hack to trigger a rerun each second while
-    # the question is active and time remains.
-    # NOTE: This is a lightweight autorefresh — it updates the page every second only during an active question.
-    if remaining > 0:
-        params = st.experimental_get_query_params()
-        now_sec = str(int(time.time()))
-        # Only set and rerun if the last refresh param isn't the current second,
-        # this prevents infinite immediate reruns inside the same second.
-        if params.get("refresh") != [now_sec]:
-            # Preserve any other params (not necessary here, but safe)
-            st.experimental_set_query_params(refresh=now_sec)
-            st.experimental_rerun()
+        st.rerun()
 
     st.subheader(f"Question {st.session_state.q_index + 1}")
     st.write(q["question"])
-    # radio with a stable key per question index to preserve user selection if rerun happens
     choice = st.radio("Options:", q["options"], key=f"q{st.session_state.q_index}")
 
-    # Submit button: process answer and advance
     if st.button("Submit Answer", key=f"submit_{st.session_state.q_index}"):
-        # Evaluate
         if choice == q["answer"]:
             st.session_state.score += 1
             st.session_state.feedback = "✅ Correct!"
@@ -240,13 +186,10 @@ def run_quiz():
             st.session_state.feedback = f"❌ Wrong! Correct answer: {q['answer']}"
         st.session_state.q_index += 1
         st.session_state.start_time = None
-        # Let the UI update to next question immediately
-        st.experimental_rerun()
+        st.rerun()
 
-    # Show feedback (if any) below the question
     if st.session_state.get("feedback"):
         st.info(st.session_state.feedback)
-        # Clear feedback so it doesn't persist into the next question render
         st.session_state.feedback = None
 
 # ==============================
@@ -254,7 +197,6 @@ def run_quiz():
 # ==============================
 st.set_page_config(layout="wide")
 
-# Sidebar Rules
 st.sidebar.title("📘 Rules")
 st.sidebar.markdown("""
 - You have **10 seconds** for each question.  
@@ -263,14 +205,13 @@ st.sidebar.markdown("""
 - Be honest & have fun! 🎉
 """)
 
-col1, col2 = st.columns([2, 1])  # 2/3 quiz, 1/3 AI
+col1, col2 = st.columns([2, 1])
 
 with col1:
     st.title("🎯 School Quiz Game")
     try:
         run_quiz()
     except Exception as e:
-        # Catch-all to avoid crashing the app UI — show helpful message for debugging
         st.error(f"An unexpected error occurred: {e}")
 
 with col2:
@@ -287,7 +228,6 @@ with col2:
                 ai_reply = f"(AI error: {e})"
             st.session_state.chat_history.append({"user": user_input, "ai": ai_reply})
 
-    # Display chat history (most recent first)
     for chat in reversed(st.session_state.chat_history):
         st.markdown(f"**You:** {chat['user']}")
         st.markdown(f"**AI:** {chat['ai']}")
