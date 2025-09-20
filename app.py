@@ -7,6 +7,7 @@ from google.oauth2.service_account import Credentials
 from groq import Groq
 from datetime import datetime
 from streamlit_autorefresh import st_autorefresh
+import pandas as pd
 
 # ==============================
 # Google Sheets Setup (robust)
@@ -42,19 +43,21 @@ def open_sheet(worksheet_name="Leaderboard"):
     return worksheet
 
 def save_result(name, score):
+    """Save result directly to Google Sheet"""
     worksheet = open_sheet("Leaderboard")
     timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
-    worksheet.append_row([name, int(score), timestamp])
+    worksheet.append_row([str(name), int(score), timestamp])
 
 def load_leaderboard(limit=50):
+    """Load leaderboard cleanly into DataFrame from Google Sheet"""
     worksheet = open_sheet("Leaderboard")
     data = worksheet.get_all_records()
-    if not data or "Score" not in data[0]:
-        return []
-    try:
-        return sorted(data, key=lambda x: int(x.get("Score", 0)), reverse=True)[:limit]
-    except Exception:
-        return sorted(data, key=lambda x: float(x.get("Score", 0) or 0), reverse=True)[:limit]
+    if not data:
+        return pd.DataFrame(columns=["Name", "Score", "Timestamp"])
+    df = pd.DataFrame(data)
+    if "Score" in df.columns:
+        df = df.sort_values(by="Score", ascending=False).head(limit)
+    return df
 
 # ==============================
 # Quiz Questions (5 each)
@@ -143,8 +146,8 @@ def run_quiz():
         st.header("🏆 Leaderboard (Top 5)")
         try:
             leaderboard = load_leaderboard()
-            if leaderboard:
-                st.table(leaderboard[:5])
+            if not leaderboard.empty:
+                st.dataframe(leaderboard.reset_index(drop=True).head(5))
             else:
                 st.info("Leaderboard is empty.")
         except Exception as e:
