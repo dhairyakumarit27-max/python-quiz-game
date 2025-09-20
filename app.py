@@ -10,7 +10,7 @@ from streamlit_autorefresh import st_autorefresh
 import pandas as pd
 
 # ==============================
-# Google Sheets Setup (robust)
+# Google Sheets Setup
 # ==============================
 def get_gspread_client():
     creds_dict = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
@@ -24,16 +24,7 @@ def get_gspread_client():
 def open_sheet(worksheet_name="Leaderboard"):
     client = get_gspread_client()
     workbook_name = st.secrets.get("GSHEET_NAME", "QuizAppDB")
-    try:
-        book = client.open(workbook_name)
-    except Exception as e:
-        try:
-            book = client.create(workbook_name)
-        except Exception as ce:
-            raise RuntimeError(
-                f"Unable to open or create workbook '{workbook_name}'. "
-                f"Original error: {e}"
-            ) from ce
+    book = client.open(workbook_name)
 
     try:
         worksheet = book.worksheet(worksheet_name)
@@ -43,13 +34,13 @@ def open_sheet(worksheet_name="Leaderboard"):
     return worksheet
 
 def save_result(name, score):
-    """Save result directly to Google Sheet"""
+    """Save result directly to Google Sheet (once at quiz end)."""
     worksheet = open_sheet("Leaderboard")
     timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
     worksheet.append_row([str(name), int(score), timestamp])
 
 def load_leaderboard(limit=50):
-    """Load leaderboard cleanly into DataFrame from Google Sheet"""
+    """Load leaderboard from Google Sheet."""
     worksheet = open_sheet("Leaderboard")
     data = worksheet.get_all_records()
     if not data:
@@ -60,7 +51,7 @@ def load_leaderboard(limit=50):
     return df
 
 # ==============================
-# Quiz Questions (5 each)
+# Quiz Questions
 # ==============================
 QUIZ_QUESTIONS = {
     "Maths": [
@@ -111,6 +102,8 @@ def run_quiz():
     # --- Registration ---
     if "registered" not in st.session_state:
         st.session_state.registered = False
+    if "result_saved" not in st.session_state:
+        st.session_state.result_saved = False  # ✅ ensure save only once
 
     if not st.session_state.registered:
         st.subheader("📝 Register to Start Quiz")
@@ -125,11 +118,8 @@ def run_quiz():
                 st.session_state.score = 0
                 st.session_state.start_time = None
                 st.session_state.feedback = None
+                st.session_state.result_saved = False
                 st.session_state.registered = True
-                try:
-                    open_sheet("Leaderboard")
-                except Exception as e:
-                    st.error(f"Warning: couldn't ensure leaderboard exists: {e}")
                 st.rerun()
             else:
                 st.warning("Please enter your name to continue.")
@@ -138,10 +128,14 @@ def run_quiz():
     # --- Quiz Finished ---
     if st.session_state.q_index >= len(st.session_state.questions):
         st.success(f"🎉 Quiz finished! Your score: {st.session_state.score}/{len(st.session_state.questions)}")
-        try:
-            save_result(st.session_state.name, st.session_state.score)
-        except Exception as e:
-            st.error(f"Could not save score to leaderboard: {e}")
+
+        # ✅ Save result only once, when quiz is over
+        if not st.session_state.result_saved:
+            try:
+                save_result(st.session_state.name, st.session_state.score)
+                st.session_state.result_saved = True
+            except Exception as e:
+                st.error(f"Could not save score to leaderboard: {e}")
 
         st.header("🏆 Leaderboard (Top 5)")
         try:
@@ -152,8 +146,10 @@ def run_quiz():
                 st.info("Leaderboard is empty.")
         except Exception as e:
             st.error(f"Error loading leaderboard: {e}")
+
         if st.button("Play Again"):
             st.session_state.registered = False
+            st.session_state.result_saved = False
             st.rerun()
         return
 
@@ -204,7 +200,7 @@ st.sidebar.title("📘 Rules")
 st.sidebar.markdown("""
 - You have **10 seconds** for each question.  
 - Once you submit, the answer is final.  
-- Score is saved to the leaderboard after the quiz.  
+- Score is saved to the leaderboard **after the quiz ends**.  
 - Be honest & have fun! 🎉
 """)
 
