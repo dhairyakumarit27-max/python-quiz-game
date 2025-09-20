@@ -20,7 +20,8 @@ def get_gspread_client():
 
 def open_sheet(sheet_name):
     client = get_gspread_client()
-    sheet = client.open("QuizAppDB")  # replace with your sheet name
+    # ⚠️ IMPORTANT: replace with your actual Google Sheet name
+    sheet = client.open("QuizAppDB")  
     return sheet.worksheet(sheet_name)
 
 def save_result(name, score):
@@ -33,24 +34,29 @@ def load_leaderboard():
     return sorted(data, key=lambda x: x["Score"], reverse=True)
 
 # ==============================
-# Quiz Questions
+# Quiz Questions (5 each)
 # ==============================
 QUIZ_QUESTIONS = {
     "Maths": [
         {"question": "5 + 3 = ?", "options": ["6", "7", "8", "9"], "answer": "8"},
         {"question": "12 ÷ 4 = ?", "options": ["2", "3", "4", "6"], "answer": "3"},
+        {"question": "15 - 7 = ?", "options": ["6", "7", "8", "9"], "answer": "8"},
+        {"question": "9 × 2 = ?", "options": ["16", "18", "20", "22"], "answer": "18"},
+        {"question": "100 ÷ 10 = ?", "options": ["5", "10", "15", "20"], "answer": "10"},
     ],
     "Science": [
-        {"question": "What planet is known as the Red Planet?", 
+        {"question": "What planet is known as the Red Planet?",
          "options": ["Earth", "Mars", "Jupiter", "Venus"], "answer": "Mars"},
-        {"question": "Which gas do humans need to breathe?", 
+        {"question": "Which gas do humans need to breathe?",
          "options": ["Oxygen", "Carbon Dioxide", "Nitrogen", "Helium"], "answer": "Oxygen"},
+        {"question": "What is H2O commonly known as?",
+         "options": ["Oxygen", "Hydrogen", "Water", "Salt"], "answer": "Water"},
+        {"question": "Which organ pumps blood in the human body?",
+         "options": ["Lungs", "Brain", "Heart", "Liver"], "answer": "Heart"},
+        {"question": "Which part of the plant makes food?",
+         "options": ["Root", "Stem", "Leaf", "Flower"], "answer": "Leaf"},
     ]
 }
-
-# Make sure total = 7
-ALL_QUESTIONS = (QUIZ_QUESTIONS["Maths"] + QUIZ_QUESTIONS["Science"]) * 2
-ALL_QUESTIONS = ALL_QUESTIONS[:7]
 
 # ==============================
 # AI Assistant Setup
@@ -76,7 +82,7 @@ def chat_with_ai(user_input, history):
 # Quiz Logic
 # ==============================
 def run_quiz():
-    # Registration
+    # --- Registration ---
     if "registered" not in st.session_state:
         st.session_state.registered = False
 
@@ -88,10 +94,7 @@ def run_quiz():
             if name.strip():
                 st.session_state.name = name
                 st.session_state.category = category
-                st.session_state.questions = random.sample(
-                    QUIZ_QUESTIONS[category], min(2, len(QUIZ_QUESTIONS[category]))
-                ) + random.sample(ALL_QUESTIONS, 5)  # total 7
-                random.shuffle(st.session_state.questions)
+                st.session_state.questions = random.sample(QUIZ_QUESTIONS[category], 5)  # 5 per subject
                 st.session_state.q_index = 0
                 st.session_state.score = 0
                 st.session_state.start_time = None
@@ -102,7 +105,7 @@ def run_quiz():
                 st.warning("Please enter your name to continue.")
         return
 
-    # Quiz running
+    # --- Quiz Finished ---
     if st.session_state.q_index >= len(st.session_state.questions):
         st.success(f"🎉 Quiz finished! Your score: {st.session_state.score}/{len(st.session_state.questions)}")
         save_result(st.session_state.name, st.session_state.score)
@@ -115,23 +118,23 @@ def run_quiz():
             st.error(f"Error loading leaderboard: {e}")
         return
 
+    # --- Current Question ---
     q = st.session_state.questions[st.session_state.q_index]
 
-    # Timer
     if st.session_state.start_time is None:
         st.session_state.start_time = time.time()
+
     elapsed = int(time.time() - st.session_state.start_time)
     remaining = max(0, 10 - elapsed)
-    st.progress(remaining / 10)
     st.write(f"⏳ Time left: {remaining} sec")
 
+    # Auto move when time up
     if remaining <= 0 and not st.session_state.feedback:
         st.session_state.feedback = "⏰ Time’s up! No points awarded."
         st.session_state.q_index += 1
         st.session_state.start_time = None
         st.rerun()
 
-    # Question display
     st.subheader(f"Question {st.session_state.q_index + 1}")
     st.write(q["question"])
     choice = st.radio("Options:", q["options"], key=f"q{st.session_state.q_index}")
@@ -146,7 +149,6 @@ def run_quiz():
         st.session_state.start_time = None
         st.rerun()
 
-    # Feedback
     if st.session_state.feedback:
         st.info(st.session_state.feedback)
         st.session_state.feedback = None
@@ -182,7 +184,6 @@ with col2:
             ai_reply = chat_with_ai(user_input, st.session_state.chat_history)
             st.session_state.chat_history.append({"user": user_input, "ai": ai_reply})
 
-    # Display in reverse (latest first)
     for chat in reversed(st.session_state.chat_history):
         st.markdown(f"**You:** {chat['user']}")
         st.markdown(f"**AI:** {chat['ai']}")
